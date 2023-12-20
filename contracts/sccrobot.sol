@@ -23,9 +23,11 @@ contract scrobot is ReentrancyGuard, Ownable {
     uint256 public lastBalance = 0;
     uint256 public timeOfHarvest = 0;
     uint256 public periodOfDay = 1 days;
+    uint256 public timeUnlock = 60 days;
 
     mapping(address => uint256) public shareOf;
     mapping(address => uint256) public rewardWantDebtOf;
+    mapping(address => uint256) public timeUnlockWithdrawOf;
 
     event onSubmit(address _user, uint256 _amount);
 
@@ -46,6 +48,10 @@ contract scrobot is ReentrancyGuard, Ownable {
         pidOfMining = _pid;
     }
 
+    function setTimeUnlockWithdraw(uint256 _time) public onlyOwner {
+        timeUnlock = _time;
+    }
+
     function submit(address _referral) external payable {
         uint256 _amount = msg.value;
         require(_amount > 0, 'INVALID_INPUT');
@@ -60,6 +66,7 @@ contract scrobot is ReentrancyGuard, Ownable {
         totalShare = totalShare.add(_amount);
 
         // update user
+        timeUnlockWithdrawOf[msg.sender] = block.timestamp.add(timeUnlock);
         rewardWantDebtOf[msg.sender] = shareOf[msg.sender].mul(accWantPerShare).div(1e24);
         miningMachine.updateUser(pidOfMining, msg.sender);
 
@@ -92,6 +99,7 @@ contract scrobot is ReentrancyGuard, Ownable {
 
     function withdraw(uint256 _wantAmt) external nonReentrant 
     {
+        require(block.timestamp > timeUnlockWithdrawOf[msg.sender], 'INVALID_TIME');
         harvest(msg.sender);
 
         if (shareOf[msg.sender] < _wantAmt) {
@@ -137,7 +145,7 @@ contract scrobot is ReentrancyGuard, Ownable {
         return _rewardPerSec.mul(periodOfDay);
     }
 
-    function userInfo(address _user) public view returns (uint256[9] memory data) {
+    function userInfo(address _user) public view returns (uint256[10] memory data) {
         data[0] = shareOf[_user];
         data[1] = totalShare;
         data[2] = pendingReward(_user);
@@ -150,5 +158,6 @@ contract scrobot is ReentrancyGuard, Ownable {
         if(data[1] > 0) {
             data[8] = data[5].mul(365).mul(10000).div(data[1]);
         }
+        data[9] = want.balanceOf(_user);
     }
 }
