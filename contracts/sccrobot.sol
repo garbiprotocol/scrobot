@@ -7,13 +7,17 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./interfaces/IstETH.sol";
+import "./interfaces/IMiningMachine.sol";
 
 contract scrobot is ReentrancyGuard, Ownable {
     using SafeMath for uint256;
     uint256 public version = 100;
 
-    // IERC20 public mainToken; 
     IstETH public stETH;
+
+    IERC20 public want;     // POINT
+    IMiningMachine public miningMachine;
+    uint256 public pidOfMining;
 
     uint256 public totalShare = 0;
     uint256 public accWantPerShare = 0;
@@ -26,9 +30,21 @@ contract scrobot is ReentrancyGuard, Ownable {
 
     event onSubmit(address _user, uint256 _amount);
 
-    constructor(address _stETH) {
-        // mainToken = IERC20(_mainToken);
+    constructor(address _stETH, address _want) {
+        want = IERC20(_want);
         stETH = IstETH(_stETH);
+    }
+
+    function setWantToken(address _want) public onlyOwner {
+        want = IERC20(_want);
+    }
+
+    function setMiningMachine(address _miningMachine) public onlyOwner {
+        miningMachine = IMiningMachine(_miningMachine);
+    }
+
+    function setPidOfMining(uint256 _pid) public onlyOwner {
+        pidOfMining = _pid;
     }
 
     function submit(address _referral) external payable {
@@ -44,7 +60,9 @@ contract scrobot is ReentrancyGuard, Ownable {
         shareOf[msg.sender] = shareOf[msg.sender].add(_amount);
         totalShare = totalShare.add(_amount);
 
+        // update user
         rewardWantDebtOf[msg.sender] = shareOf[msg.sender].mul(accWantPerShare).div(1e24);
+        miningMachine.updateUser(pidOfMining, msg.sender);
 
         lastBalance = stETH.balanceOf(address(this));
 
@@ -53,6 +71,7 @@ contract scrobot is ReentrancyGuard, Ownable {
 
     function harvest(address _user) public {
         timeOfHarvest = block.timestamp;
+        miningMachine.harvest(pidOfMining, _user);
         uint256 _reward = stETH.balanceOf(address(this)).sub(lastBalance);
         if (_reward > 0 && totalShare > 0) {
             accWantPerShare = accWantPerShare.add(_reward.mul(1e24).div(totalShare));
@@ -85,7 +104,9 @@ contract scrobot is ReentrancyGuard, Ownable {
 
         stETH.transfer(msg.sender, _wantAmt);
 
+        // update user
         rewardWantDebtOf[msg.sender] = shareOf[msg.sender].mul(accWantPerShare).div(1e24);
+        miningMachine.updateUser(pidOfMining, msg.sender);
 
         lastBalance = stETH.balanceOf(address(this));
     }
@@ -116,15 +137,18 @@ contract scrobot is ReentrancyGuard, Ownable {
         return _rewardPerSec.mul(periodOfDay);
     }
 
-    function userInfo(address _user) public view returns (uint256[7] memory data) {
+    function userInfo(address _user) public view returns (uint256[9] memory data) {
         data[0] = shareOf[_user];
         data[1] = totalShare;
         data[2] = pendingReward(_user);
         data[3] = stETH.balanceOf(_user);
         data[4] = address(_user).balance;
         data[5] = getTotalRewardPerDay();
+        data[6] = miningMachine.getTotalMintPerDayOf(pidOfMining);
+        (data[7], , ) = miningMachine.getUserInfo(pidOfMining, _user);
+        
         if(data[1] > 0) {
-            data[6] = data[5].mul(365).mul(10000).div(data[1]);
+            data[8] = data[5].mul(365).mul(10000).div(data[1]);
         }
     }
 }
