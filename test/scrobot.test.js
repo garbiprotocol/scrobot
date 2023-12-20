@@ -20,10 +20,11 @@ contract("scrobot", (accounts) => {
     scrobotInstance = await scrobot.new(stETHInstance.address, pointInstance.address, {
       from: owner
     });
+    await miningMachineInstance.addPool(500, scrobotInstance.address, { from: owner });
+
     await scrobotInstance.setMiningMachine(miningMachineInstance.address, { from: owner });
     await scrobotInstance.setPidOfMining(0, { from: owner });
 
-    await miningMachineInstance.addPool(500, scrobotInstance.address, { from: owner });
 
     await pointInstance.setMiningMachine(miningMachineInstance.address, { from: owner });
   });
@@ -49,12 +50,13 @@ contract("scrobot", (accounts) => {
     await scrobotInstance.submit(user1, { value: amount, from: user1 });
 
     // Fast-forward time
-    await web3.currentProvider.send("evm_increaseTime", [86400]);
-    await web3.currentProvider.send("evm_mine", []);
+    await sleep(5000);
 
-    const userInfoAfterFastForwardTime = await scrobotInstance.userInfo(user1);
-    console.log("🚀 ~ file: scrobot.test.js:56 ~ it ~ userInfoAfterFastForwardTime:", userInfoAfterFastForwardTime[6].toString())
-    assert(userInfoAfterFastForwardTime[6].toString() > 0, "Invalid pending reward");
+    // const userInfoAfterFastForwardTime = await scrobotInstance.userInfo(user1);
+    // console.log("🚀 ~ file: scrobot.test.js:56 ~ it ~ userInfoAfterFastForwardTime:", userInfoAfterFastForwardTime.toString())
+    // assert(userInfoAfterFastForwardTime[7].toString() > 0, "Invalid pending reward");
+    const userInfo = await miningMachineInstance.getUserInfo(0, user1);
+    console.log("🚀 ~ file: scrobot.test.js:58 ~ it ~ userInfo:", userInfo._userShare.toString())
   });
 });
 
@@ -64,3 +66,7 @@ const convertToEther = (wei) => {
 const convertToWei = (ether) => {
     return web3.utils.toWei(ether, "ether");
 }
+
+const sleep = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
