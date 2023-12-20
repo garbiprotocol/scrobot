@@ -2,6 +2,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
     "truffle-flattener": "^1.6.0",
-    "truffle-plugin-verify": "^0.5.33"
+    "truffle-plugin-verify": "^0.5.33",
+    "web3": "^4.3.0"
   }
 }

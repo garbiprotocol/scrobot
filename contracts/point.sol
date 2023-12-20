@@ -27,7 +27,7 @@ contract point is Ownable, ERC20Burnable {
         _;
     }
 
-    function setMiningMachineContract(address _miningMachineContract) external onlyOwner {
+    function setMiningMachine(address _miningMachineContract) external onlyOwner {
         miningMachineContract = _miningMachineContract;
     }
 
