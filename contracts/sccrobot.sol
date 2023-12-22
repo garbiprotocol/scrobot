@@ -145,7 +145,7 @@ contract scrobot is ReentrancyGuard, Ownable {
         return _rewardPerSec.mul(periodOfDay);
     }
 
-    function userInfo(address _user) public view returns (uint256[10] memory data) {
+    function userInfo(address _user) public view returns (uint256[12] memory data) {
         data[0] = shareOf[_user];
         data[1] = totalShare;
         data[2] = pendingReward(_user);
@@ -159,5 +159,7 @@ contract scrobot is ReentrancyGuard, Ownable {
             data[8] = data[5].mul(365).mul(10000).div(data[1]);
         }
         data[9] = want.balanceOf(_user);
+        data[10] = timeUnlockWithdrawOf[_user];
+        data[11] = block.timestamp;
     }
 }
