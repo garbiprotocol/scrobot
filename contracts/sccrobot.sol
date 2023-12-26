@@ -23,11 +23,13 @@ contract scrobot is ReentrancyGuard, Ownable {
     uint256 public lastBalance = 0;
     uint256 public timeOfHarvest = 0;
     uint256 public periodOfDay = 1 days;
-    uint256 public timeUnlock = 60 days;
+    uint256 public timeUnlock = 7 days;
+    uint256 public timeUnlockWithdrawReward = 60 days;
 
     mapping(address => uint256) public shareOf;
+    mapping(address => uint256) public shareOfLocked;
     mapping(address => uint256) public rewardWantDebtOf;
-    mapping(address => uint256) public timeUnlockWithdrawOf;
+    mapping(address => uint256) public lastTimeSubmitOf;
 
     event onSubmit(address _user, uint256 _amount);
 
@@ -52,6 +54,10 @@ contract scrobot is ReentrancyGuard, Ownable {
         timeUnlock = _time;
     }
 
+    function setTimeUnlockWithdrawReward(uint256 _time) public onlyOwner {
+        timeUnlockWithdrawReward = _time;
+    }
+
     function submit(address _referral) external payable {
         uint256 _amount = msg.value;
         require(_amount > 0, 'INVALID_INPUT');
@@ -66,7 +72,7 @@ contract scrobot is ReentrancyGuard, Ownable {
         totalShare = totalShare.add(_amount);
 
         // update user
-        timeUnlockWithdrawOf[msg.sender] = block.timestamp.add(timeUnlock);
+        lastTimeSubmitOf[msg.sender] = block.timestamp;
         rewardWantDebtOf[msg.sender] = shareOf[msg.sender].mul(accWantPerShare).div(1e24);
         miningMachine.updateUser(pidOfMining, msg.sender);
 
@@ -79,15 +85,17 @@ contract scrobot is ReentrancyGuard, Ownable {
         timeOfHarvest = block.timestamp;
         miningMachine.harvest(pidOfMining, _user);
         uint256 _reward = stETH.balanceOf(address(this)).sub(lastBalance);
+
         if (_reward > 0 && totalShare > 0) {
             accWantPerShare = accWantPerShare.add(_reward.mul(1e24).div(totalShare));
-
         }
+
         uint256 _userRewardDebt  = shareOf[_user].mul(accWantPerShare).div(1e24);
 
         if (_userRewardDebt > rewardWantDebtOf[_user]) {
             uint256 _userPendingWant = _userRewardDebt.sub(rewardWantDebtOf[_user]);
             shareOf[_user] = shareOf[_user].add(_userPendingWant);
+            shareOfLocked[_user] = shareOfLocked[_user].add(_userPendingWant);
             totalShare = totalShare.add(_userPendingWant); 
             miningMachine.harvest(pidOfMining, _user);
         }
@@ -99,15 +107,22 @@ contract scrobot is ReentrancyGuard, Ownable {
 
     function withdraw(uint256 _wantAmt) external nonReentrant 
     {
-        require(block.timestamp > timeUnlockWithdrawOf[msg.sender], 'INVALID_TIME');
-        harvest(msg.sender);
+        address _user = msg.sender;
+        require(block.timestamp > lastTimeSubmitOf[_user].add(timeUnlock), 'INVALID_TIME');
 
-        if (shareOf[msg.sender] < _wantAmt) {
-            _wantAmt = shareOf[msg.sender];
+        harvest(_user);
+        
+        if(block.timestamp > lastTimeSubmitOf[_user].add(timeUnlockWithdrawReward)) {
+            shareOfLocked[_user] = 0;
+        }
+
+        uint256 shareOfWithdraw = shareOf[_user].sub(shareOfLocked[_user]);
+        if (shareOfWithdraw < _wantAmt) {
+            _wantAmt = shareOfWithdraw;
         }
         require(_wantAmt > 0, 'INVALID_INPUT');
 
-        shareOf[msg.sender] = shareOf[msg.sender].sub(_wantAmt);
+        shareOf[_user] = shareOfWithdraw.sub(_wantAmt);
         totalShare = totalShare.sub(_wantAmt);
 
         stETH.transfer(msg.sender, _wantAmt);
@@ -145,7 +160,7 @@ contract scrobot is ReentrancyGuard, Ownable {
         return _rewardPerSec.mul(periodOfDay);
     }
 
-    function userInfo(address _user) public view returns (uint256[12] memory data) {
+    function userInfo(address _user) public view returns (uint256[14] memory data) {
         data[0] = shareOf[_user];
         data[1] = totalShare;
         data[2] = pendingReward(_user);
@@ -159,7 +174,9 @@ contract scrobot is ReentrancyGuard, Ownable {
             data[8] = data[5].mul(365).mul(10000).div(data[1]);
         }
         data[9] = want.balanceOf(_user);
-        data[10] = timeUnlockWithdrawOf[_user];
+        data[10] = lastTimeSubmitOf[_user];
         data[11] = block.timestamp;
+        data[12] = shareOfLocked[_user];
+        data[13] = (data[11] > data[10].add(timeUnlockWithdrawReward)) ? data[0] : data[0].sub(data[12]);
     }
 }

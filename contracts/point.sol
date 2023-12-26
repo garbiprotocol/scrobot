@@ -14,15 +14,20 @@ contract point is Ownable, ERC20Burnable {
     address public miningMachineContract;
     uint256 public immutable MAX_SUPPLY;
     uint256 public totalBurned = 0;
+
+    address public pointTaskPool;
+    address public pointMarkettingPool;
     
     constructor(
         uint256 _maxSupply
-    ) ERC20("point token", "POINT"){
+    ) ERC20("point token", "POINT") {
         MAX_SUPPLY = _maxSupply;
+
+        _mint(pointTaskPool, MAX_SUPPLY.mul(5).div(100));
+        _mint(pointMarkettingPool, MAX_SUPPLY.mul(5).div(100));
     }
     
-    modifier onlyMiningMachine()
-    {
+    modifier onlyMiningMachine() {
         require(msg.sender == miningMachineContract, 'INVALID_MINING_MACHINE');
         _;
     }
