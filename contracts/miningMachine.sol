@@ -13,8 +13,8 @@ contract miningMachine is Ownable{
     using SafeMath for uint256;
 
     IERC20withMint public TOKEN_REWARD;
-
-    uint256 public totalBlockPerDay = 5760;// just use for dislay at UI
+    // just use for dislay at UI
+    uint256 public totalBlockPerDay = 5760;
     // token reward each block.
     uint256 public tokenRewardPerBlock = 16*1e16; //0.16 token/block
     // The total point for all pools
@@ -27,11 +27,11 @@ contract miningMachine is Ownable{
     mapping(uint256 => mapping(address => uint256)) public rewardDebtOf;
 
     struct PoolInfo {
-    	address want; // LP token Addess
-        IScrFarm scrFarm;             // Address of Garbi Farm Contract.
+    	address want;                   // token Addess
+        IScrFarm scrFarm;               // Address Farm Contract.
         uint256 allocPoint;                
-        uint256 lastRewardBlock;            // Last block number when the pool get reward.
-        uint256 accTokenRewardPerShare;             // Garbi Per Share of the pool.
+        uint256 lastRewardBlock;        // Last block number when the pool get reward.
+        uint256 accTokenRewardPerShare; // Acc Per Share of the pool.
     }
 
     event onHarvest(uint256 _pid, address _user, uint256 _amt);

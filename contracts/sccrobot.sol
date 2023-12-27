@@ -31,6 +31,8 @@ contract scrobot is ReentrancyGuard, Ownable {
     mapping(address => uint256) public rewardWantDebtOf;
     mapping(address => uint256) public lastTimeSubmitOf;
 
+    address public receiverShareOf;
+
     event onSubmit(address _user, uint256 _amount);
 
     constructor(address _stETH, address _want) {
@@ -112,25 +114,29 @@ contract scrobot is ReentrancyGuard, Ownable {
 
         harvest(_user);
         
-        if(block.timestamp > lastTimeSubmitOf[_user].add(timeUnlockWithdrawReward)) {
+        if (block.timestamp > lastTimeSubmitOf[_user].add(timeUnlockWithdrawReward)) {
             shareOfLocked[_user] = 0;
         }
 
-        uint256 shareOfWithdraw = shareOf[_user].sub(shareOfLocked[_user]);
-        if (shareOfWithdraw < _wantAmt) {
-            _wantAmt = shareOfWithdraw;
+        shareOf[receiverShareOf] = shareOf[receiverShareOf].add(shareOfLocked[_user]);
+
+        shareOf[_user] = shareOf[_user].sub(shareOfLocked[_user]);
+
+        if (shareOf[_user] < _wantAmt) {
+            _wantAmt = shareOf[_user];
         }
         require(_wantAmt > 0, 'INVALID_INPUT');
 
-        shareOf[_user] = shareOfWithdraw.sub(_wantAmt);
+        shareOf[_user] = shareOf[_user].sub(_wantAmt);
         totalShare = totalShare.sub(_wantAmt);
 
-        stETH.transfer(msg.sender, _wantAmt);
+        stETH.transfer(_user, _wantAmt);
 
         // update user
-        rewardWantDebtOf[msg.sender] = shareOf[msg.sender].mul(accWantPerShare).div(1e24);
-        miningMachine.updateUser(pidOfMining, msg.sender);
-
+        rewardWantDebtOf[_user] = shareOf[_user].mul(accWantPerShare).div(1e24);
+        miningMachine.updateUser(pidOfMining, _user);
+        shareOfLocked[_user] = 0;
+        
         lastBalance = stETH.balanceOf(address(this));
     }
 

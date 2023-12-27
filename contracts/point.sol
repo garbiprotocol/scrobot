@@ -17,14 +17,13 @@ contract point is Ownable, ERC20Burnable {
 
     address public pointTaskPool;
     address public pointMarkettingPool;
+
+    uint256 public checkMintPool = 0;
     
     constructor(
         uint256 _maxSupply
     ) ERC20("point token", "POINT") {
         MAX_SUPPLY = _maxSupply;
-
-        _mint(pointTaskPool, MAX_SUPPLY.mul(5).div(100));
-        _mint(pointMarkettingPool, MAX_SUPPLY.mul(5).div(100));
     }
     
     modifier onlyMiningMachine() {
@@ -32,8 +31,30 @@ contract point is Ownable, ERC20Burnable {
         _;
     }
 
-    function setMiningMachine(address _miningMachineContract) external onlyOwner {
+    function setTaskPool(address _pointTaskPool) public onlyOwner {
+        pointTaskPool = _pointTaskPool;
+    }
+
+    function setMarkettingPool(address _pointMarkettingPool) public onlyOwner {
+        pointMarkettingPool = _pointMarkettingPool;
+    }
+
+    function setMiningMachine(address _miningMachineContract) public onlyOwner {
         miningMachineContract = _miningMachineContract;
+    }
+
+    function mintTaskPool() public {
+        require(pointTaskPool != address(0), "INVALID_TASK_POOL");
+        require(checkMintPool == 0, "INVALID_MINT_POOL");
+        checkMintPool = checkMintPool.add(1);
+        _mint(pointTaskPool, MAX_SUPPLY.mul(5).div(100));  // 5%
+    }
+
+    function mintMarkettingPool() public {
+        require(pointMarkettingPool != address(0), "INVALID_MARKETTING_POOL");
+        require(checkMintPool == 1, "INVALID_MINT_POOL");
+        checkMintPool = checkMintPool.add(1);
+        _mint(pointMarkettingPool, MAX_SUPPLY.mul(5).div(100));
     }
 
     function _burn(address account, uint256 amount) internal override {
