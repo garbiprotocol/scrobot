@@ -60,6 +60,10 @@ contract scrobot is ReentrancyGuard, Ownable {
         timeUnlockWithdrawReward = _time;
     }
 
+    function setReceiverShareOf(address _receiver) public onlyOwner {
+        receiverShareOf = _receiver;
+    }
+
     function submit(address _referral) external payable {
         uint256 _amount = msg.value;
         require(_amount > 0, 'INVALID_INPUT');
