@@ -14,7 +14,7 @@ contract miningMachine is Ownable{
 
     IERC20withMint public TOKEN_REWARD;
     // just use for dislay at UI
-    uint256 public totalBlockPerDay = 5760;
+    uint256 public totalBlockPerDay = 14400;    // 8s/block, 60*60*24/8 = 14400 block/day
     // token reward each block.
     uint256 public tokenRewardPerBlock = 16*1e16; //0.16 token/block
     // The total point for all pools
@@ -46,6 +46,10 @@ contract miningMachine is Ownable{
 
     function setTotalBlockPerDay(uint256 _totalBlockPerDay) public onlyOwner {
         totalBlockPerDay = _totalBlockPerDay;
+    }
+
+    function setTokenRewardPerBlock(uint256 _tokenRewardPerBlock) public onlyOwner {
+        tokenRewardPerBlock = _tokenRewardPerBlock;
     }
 
     function setTotalAllocPoint(uint256 _totalAllPoint) public onlyOwner {
@@ -106,8 +110,7 @@ contract miningMachine is Ownable{
         pool.lastRewardBlock = block.number;
     }
 
-    function harvest(uint256 _pid, address _user) external returns(uint256 _pendingTokenReward) 
-    {	
+    function harvest(uint256 _pid, address _user) external returns(uint256 _pendingTokenReward) {	
     	updatePool(_pid);
     
     	uint256 _rewardDebt;
