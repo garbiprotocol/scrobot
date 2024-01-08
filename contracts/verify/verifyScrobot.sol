@@ -795,6 +795,7 @@ contract scrobot is ReentrancyGuard, Ownable {
     uint256 public accWantPerShare = 0;
     uint256 public lastBalance = 0;
     uint256 public timeOfHarvest = 0;
+    uint256 public lastCaculationReward = 0;
     uint256 public periodOfDay = 1 days;
     uint256 public timeUnlock = 7 days;
     uint256 public timeUnlockWithdrawReward = 60 days;
@@ -804,6 +805,8 @@ contract scrobot is ReentrancyGuard, Ownable {
     mapping(address => uint256) public rewardWantDebtOf;
     mapping(address => uint256) public lastTimeSubmitOf;
 
+    uint256 public calculationRewardBlock = 10;
+
     address public receiverShareOf;
 
     event onSubmit(address _user, uint256 _amount);
@@ -811,6 +814,8 @@ contract scrobot is ReentrancyGuard, Ownable {
     constructor(address _stETH, address _want) {
         want = IERC20(_want);
         stETH = IstETH(_stETH);
+
+        lastCaculationReward = block.number;
     }
 
     function setWantToken(address _want) public onlyOwner {
@@ -831,6 +836,14 @@ contract scrobot is ReentrancyGuard, Ownable {
 
     function setTimeUnlockWithdrawReward(uint256 _time) public onlyOwner {
         timeUnlockWithdrawReward = _time;
+    }
+
+    function setReceiverShareOf(address _receiver) public onlyOwner {
+        receiverShareOf = _receiver;
+    }
+
+    function setCalculationRewardBlock(uint256 _quantityBlock) public onlyOwner {
+        calculationRewardBlock = _quantityBlock;
     }
 
     function submit(address _referral) external payable {
@@ -859,25 +872,30 @@ contract scrobot is ReentrancyGuard, Ownable {
     function harvest(address _user) public {
         timeOfHarvest = block.timestamp;
         miningMachine.harvest(pidOfMining, _user);
-        uint256 _reward = stETH.balanceOf(address(this)).sub(lastBalance);
+        
+        if(block.number >= lastCaculationReward.add(calculationRewardBlock)) {
+            lastCaculationReward = block.number;
+            uint256 currentBalance = stETH.balanceOf(address(this));
+            uint256 _reward = currentBalance <= lastBalance ? 0 : currentBalance.sub(lastBalance);
+        
+            if (_reward > 0 && totalShare > 0) {
+                accWantPerShare = accWantPerShare.add(_reward.mul(1e24).div(totalShare));
+            }
 
-        if (_reward > 0 && totalShare > 0) {
-            accWantPerShare = accWantPerShare.add(_reward.mul(1e24).div(totalShare));
+            uint256 _userRewardDebt  = shareOf[_user].mul(accWantPerShare).div(1e24);
+
+            if (_userRewardDebt > rewardWantDebtOf[_user]) {
+                uint256 _userPendingWant = _userRewardDebt.sub(rewardWantDebtOf[_user]);
+                shareOf[_user] = shareOf[_user].add(_userPendingWant);
+                shareOfLocked[_user] = shareOfLocked[_user].add(_userPendingWant);
+                totalShare = totalShare.add(_userPendingWant); 
+                miningMachine.harvest(pidOfMining, _user);
+            }
+
+            rewardWantDebtOf[_user] = shareOf[_user].mul(accWantPerShare).div(1e24);
+            // update lastBalance
+            lastBalance = currentBalance;
         }
-
-        uint256 _userRewardDebt  = shareOf[_user].mul(accWantPerShare).div(1e24);
-
-        if (_userRewardDebt > rewardWantDebtOf[_user]) {
-            uint256 _userPendingWant = _userRewardDebt.sub(rewardWantDebtOf[_user]);
-            shareOf[_user] = shareOf[_user].add(_userPendingWant);
-            shareOfLocked[_user] = shareOfLocked[_user].add(_userPendingWant);
-            totalShare = totalShare.add(_userPendingWant); 
-            miningMachine.harvest(pidOfMining, _user);
-        }
-
-        rewardWantDebtOf[_user] = shareOf[_user].mul(accWantPerShare).div(1e24);
-        // update lastBalance
-        lastBalance = stETH.balanceOf(address(this));
     }
 
     function withdraw(uint256 _wantAmt) external nonReentrant 
